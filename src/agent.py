@@ -10,34 +10,44 @@ from objects import *
 from models import *
 import hyperparameters as hp
 
+def get_device():
+    if torch.cuda.is_available():
+        return torch.device('cuda:0')
+    return torch.device('cpu')
+
 def to_numpy(item):
     if item.is_cuda:
-        return item.cpu().detach().numpy() 
+        return item.cpu().detach().numpy()
     else:
         return item.detach().numpy()
 
 def to_tensor(item):
-    if torch.cuda.is_available():
-        return torch.tensor(item, device=torch.device('cuda:0'), dtype=torch.float)
-    else:
-        return torch.tensor(item, dtype=torch.float)
+    return torch.tensor(item, device=get_device(), dtype=torch.float)
 
 class Agent():
     def __init__(self, folder=None):
         self.criterion_agent = nn.NLLLoss()
         self.folder = folder
+        self.device = get_device()
 
         self.zone_encoder = ZoneEncoder(zone_sample_num, hp.gnn_node_feat_dim)
-        self.zone_encoder.cuda()
+        self.zone_encoder.to(self.device)
 
         self.decision_maker = GraphNetSoftMax(hp.gnn_node_feat_dim, 2)
-        self.decision_maker.cuda()
+        self.decision_maker.to(self.device)
 
         self.optim_extrusion = Adam(list(self.zone_encoder.parameters()) + list(self.decision_maker.parameters()), lr=hp.learning_rate_optim_extrusion)
 
+    def train_mode(self):
+        self.zone_encoder.train()
+        self.decision_maker.train()
+
+    def eval_mode(self):
+        self.zone_encoder.eval()
+        self.decision_maker.eval()
+
     def encode_zone_graph(self, zone_graph):
-        g = dgl.DGLGraph()
-        g.add_nodes(len(zone_graph.zone_graph.nodes))
+        node_num = len(zone_graph.zone_graph.nodes)
 
         node_shape_positions = nx.get_node_attributes(zone_graph.zone_graph, 'shape_positions')
         node_shape_normals = nx.get_node_attributes(zone_graph.zone_graph, 'shape_normals')
@@ -103,18 +113,19 @@ class Agent():
         features = torch.cat((shape_positions, shape_normals, current_labels, target_labels, extrusion_labels, bool_labels), dim=2)
         features = torch.transpose(features, 2, 1)
         encoded_features = self.zone_encoder(features)
-        g.ndata['h'] = encoded_features
-        
+
         src = []
         dst = []
         for e in zone_graph.zone_graph.edges:
             src.append(e[0])
             dst.append(e[1])
-        src = tuple(src)
-        dst = tuple(dst)
 
-        g.add_edges(src, dst)
-        g.add_edges(dst, src)
+        # the zone graph is undirected, so every edge is added in both directions
+        u = torch.tensor(src + dst, dtype=torch.int64, device=self.device)
+        v = torch.tensor(dst + src, dtype=torch.int64, device=self.device)
+
+        g = dgl.graph((u, v), num_nodes=node_num, device=self.device)
+        g.ndata['h'] = encoded_features
 
         return g
 
@@ -159,15 +170,15 @@ class Agent():
         torch.save(self.decision_maker.state_dict(), os.path.join(self.folder,"best_decision_maker.pkl"))
 
     def load_weights(self):
-        state_dict = torch.load(os.path.join(self.folder,"zone_encoder.pkl"))
+        state_dict = torch.load(os.path.join(self.folder,"zone_encoder.pkl"), map_location=self.device)
         self.zone_encoder.load_state_dict(state_dict)
-        state_dict = torch.load(os.path.join(self.folder,"decision_maker.pkl"))
+        state_dict = torch.load(os.path.join(self.folder,"decision_maker.pkl"), map_location=self.device)
         self.decision_maker.load_state_dict(state_dict)
-        
+
     def load_best_weights(self):
-        state_dict = torch.load(os.path.join(self.folder,"zone_encoder.pkl"))
+        state_dict = torch.load(os.path.join(self.folder,"best_zone_encoder.pkl"), map_location=self.device)
         self.zone_encoder.load_state_dict(state_dict)
-        state_dict = torch.load(os.path.join(self.folder,"decision_maker.pkl"))
+        state_dict = torch.load(os.path.join(self.folder,"best_decision_maker.pkl"), map_location=self.device)
         self.decision_maker.load_state_dict(state_dict)
 
 

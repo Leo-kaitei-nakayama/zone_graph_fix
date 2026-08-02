@@ -91,8 +91,9 @@ class MPLayer(nn.Module):
 
     def forward(self, g, node_feats):
         g.ndata['h'] = node_feats
-        g.send(g.edges(), self.message)
-        g.recv(g.nodes(), self.reduce)
+        # equivalent to the removed send()/recv() pair: message on every edge,
+        # reduce on every node
+        g.update_all(self.message, self.reduce)
         h = g.ndata.pop('h')
         h = self.linear(h)
         return h
