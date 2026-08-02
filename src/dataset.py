@@ -160,11 +160,11 @@ class DataManager:
                 ret = self.check_extrusion_volume(extrusion, zone_graph)
                 if not ret:
                     return [], 'extrusion_mismatch'
-                sequence.append((copy.deepcopy(zone_graph), copy.deepcopy(extrusion)))
+                sequence.append((zone_graph.copy(), extrusion.copy()))
                 next_zone_graph = zone_graph.update_to_next_zone_graph(extrusion)
                 zone_graph = next_zone_graph
             else:
-                sequence.append((copy.deepcopy(zone_graph), None))
+                sequence.append((zone_graph.copy(), None))
 
         return sequence, None
 
@@ -233,7 +233,7 @@ class DataManager:
             #     display_object(extrusion_shape, bound_obj=zone_graph.bbox, color=(1.0, 0.0, 0), file=step_path + '_extrusion.png')
 
     def simulate_sequence(self, seq):
-        zone_graph = copy.deepcopy(seq[0][0])
+        zone_graph = seq[0][0].copy()
         for i, step in enumerate(seq):
             gt_extrusion = step[1]
             next_extrusion = None

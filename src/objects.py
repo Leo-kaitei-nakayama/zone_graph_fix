@@ -41,6 +41,19 @@ class Extrusion:
     def hash(self):
         return tuple(sorted(self.zone_indices))
     
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        if self.cad_shape:
+            state['cad_shape'] = self.cad_shape.exportBrepToString()
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        if self.cad_shape:
+            shape = Part.Shape()
+            shape.importBrepFromString(self.cad_shape)
+            self.cad_shape = shape
+    
 def get_extrusion_heur_score(extrusion, zone_graph):
     zone_to_current_label = copy.deepcopy(zone_graph.zone_to_current_label)
     zone_to_target_label = zone_graph.zone_to_target_label
@@ -83,6 +96,19 @@ class Zone:
         self.sample_normals = None
         self.score = 0
         self.inside_points = []
+        
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        if self.cad_shape:
+            state['cad_shape'] = self.cad_shape.exportBrepToString()
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        if self.cad_shape:
+            shape = Part.Shape()
+            shape.importBrepFromString(self.cad_shape)
+            self.cad_shape = shape
     
     def cal_inside_points(self):
         inside_points = []
@@ -95,6 +121,15 @@ class Zone:
                 inside_points.append(None)
 
         return inside_points
+    
+    def copy(self):
+        new = Zone()
+        new.cad_shape = self.cad_shape.copy() if self.cad_shape else None
+        new.sample_positions = copy.deepcopy(self.sample_positions)
+        new.sample_normals = copy.deepcopy(self.sample_normals)
+        new.score = self.score
+        new.inside_points = copy.deepcopy(self.inside_points)
+        return new
 
 class ZoneGraph:
     def __init__(self, is_forward=True):
@@ -124,6 +159,69 @@ class ZoneGraph:
   
         self.plane_to_pos_zones = defaultdict(set)
         self.plane_to_neg_zones = defaultdict(set)
+        
+        
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state['current_shape'] = self.current_shape.exportBrepToString() if self.current_shape else None
+        state['target_shape'] = self.target_shape.exportBrepToString() if self.target_shape else None
+        state['faces'] = [f.exportBrepToString() for f in self.faces]
+        state['planes'] = [p.exportBrepToString() for p in self.planes]
+        # zones自体はZoneオブジェクトのリストなので、Zone側のgetstateが自動で使われます
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        if self.current_shape:
+            shape = Part.Shape()
+            shape.importBrepFromString(self.current_shape)
+            self.current_shape = shape
+        if self.target_shape:
+            shape = Part.Shape()
+            shape.importBrepFromString(self.target_shape)
+            self.target_shape = shape
+
+        new_faces = []
+        for f_str in self.faces:
+            shape = Part.Shape()
+            shape.importBrepFromString(f_str)
+            new_faces.append(shape)
+        self.faces = new_faces
+
+        new_planes = []
+        for p_str in self.planes:
+            shape = Part.Shape()
+            shape.importBrepFromString(p_str)
+            new_planes.append(shape)
+        self.planes = new_planes
+        
+    def copy(self):
+        new = ZoneGraph()
+        new.bbox = self.bbox
+        new.current_shape = self.current_shape.copy() if self.current_shape else None
+        new.target_shape = self.target_shape.copy() if self.target_shape else None
+
+        new.zones = [z.copy() for z in self.zones]
+        new.faces = [f.copy() for f in self.faces]
+        new.planes = [p.copy() for p in self.planes]
+
+        new.zone_graph = copy.deepcopy(self.zone_graph)
+        new.zone_to_faces = copy.deepcopy(self.zone_to_faces)
+        new.zone_to_current_label = copy.deepcopy(self.zone_to_current_label)
+        new.zone_to_target_label = copy.deepcopy(self.zone_to_target_label)
+
+        new.exterior_faces = copy.deepcopy(self.exterior_faces)
+        new.face_to_zones = copy.deepcopy(self.face_to_zones)
+        new.face_to_current_label = copy.deepcopy(self.face_to_current_label)
+        new.face_to_target_label = copy.deepcopy(self.face_to_target_label)
+        new.face_to_extrusion_zones = copy.deepcopy(self.face_to_extrusion_zones)
+
+        new.plane_to_faces = copy.deepcopy(self.plane_to_faces)
+        new.plane_to_face_graph = copy.deepcopy(self.plane_to_face_graph)
+        new.plane_to_pos_zones = copy.deepcopy(self.plane_to_pos_zones)
+        new.plane_to_neg_zones = copy.deepcopy(self.plane_to_neg_zones)
+
+        return new
 
     def build(self, use_face_loop = True):
         if len(self.zones) > 0:
