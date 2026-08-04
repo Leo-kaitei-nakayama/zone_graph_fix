@@ -11,9 +11,11 @@ from dataset import *
 from search import *
 from utils.file_utils import *
 import time
-from agent import Agent
 import shutil
 import multiprocessing
+
+# Agent is imported lazily below: it pulls in torch and DGL, which the random
+# and heuristic options do not need.
 
 # from utils.vis_utils import *
 
@@ -25,6 +27,8 @@ def infer(seq_id, sort_option, data_path, max_time, max_step):
     folder = str(sort_option)
     agent = None
     if sort_option == 'agent':
+        from agent import Agent
+
         agent = Agent('../../train_output')
         agent.load_weights()
         agent.eval()

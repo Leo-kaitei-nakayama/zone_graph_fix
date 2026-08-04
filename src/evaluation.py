@@ -4,7 +4,9 @@ sys.path.append('..')
 from objects import *
 import random
 import time
-import torch
+
+# torch is imported lazily inside sort_extrusions_by_agent so that the random
+# and heuristic search options run without a torch/DGL install.
 
 def sort_extrusions_by_random(extrusions):
     random.shuffle(extrusions)
@@ -18,6 +20,8 @@ def sort_extrusions_by_heur(extrusions, zone_graph):
     return sorted_extrusions
 
 def sort_extrusions_by_agent(extrusions, zone_graph, agent):
+    import torch
+
     with torch.no_grad():
         start_time = time.time()
         if len(extrusions) == 1:

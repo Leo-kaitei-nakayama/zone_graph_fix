@@ -10,7 +10,6 @@ import numpy as np
 from dataset import *
 from objects import *
 from evaluation import *
-from agent import *
 from proposal import *
 from queue import Queue, LifoQueue, PriorityQueue
 
