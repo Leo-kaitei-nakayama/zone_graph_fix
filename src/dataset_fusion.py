@@ -95,71 +95,75 @@ class FusionDataManager:
 
 
     def get_data_by_pair(self, pair):
-        current_dir = pair[0]
-        next_dir = pair[1]
-        temp_target_dir = pair[2]
-        final_target_dir= pair[3]
-        index = pair[4]
+        try:
+            current_dir = pair[0]
+            next_dir = pair[1]
+            temp_target_dir = pair[2]
+            final_target_dir= pair[3]
+            index = pair[4]
 
-        count = pair[5]
+            count = pair[5]
 
-        segs = next_dir.split('/')[-1].split('_')
-        file_name = '_'.join([segs[0],segs[1],segs[2]])
+            segs = next_dir.split('/')[-1].split('_')
+            file_name = '_'.join([segs[0],segs[1],segs[2]])
 
-        data = Data()
-        data.file_name = file_name
-        data.index = index
+            data = Data()
+            data.file_name = file_name
+            data.index = index
 
-        data.count = count
-        data.target_shape.read(temp_target_dir)
+            data.count = count
+            data.target_shape.read(temp_target_dir)
 
-        # calculate normalize scale factor
-        final_cad_shape = Part.Shape()
-        final_cad_shape.read(final_target_dir)
-        bbox = final_cad_shape.BoundBox
-        bbox_data = str(bbox).split('BoundBox (')[1].split(')')[0].split(',')
-        bbox_data = [float(item) for item in bbox_data]
-        w = bbox_data[3]-bbox_data[0]
-        d = bbox_data[4]-bbox_data[1]
-        h = bbox_data[5]-bbox_data[2]
-        x = (bbox_data[3]+bbox_data[0])/2
-        y = (bbox_data[4]+bbox_data[1])/2
-        z = (bbox_data[5]+bbox_data[2])/2
+            # calculate normalize scale factor
+            final_cad_shape = Part.Shape()
+            final_cad_shape.read(final_target_dir)
+            bbox = final_cad_shape.BoundBox
+            bbox_data = str(bbox).split('BoundBox (')[1].split(')')[0].split(',')
+            bbox_data = [float(item) for item in bbox_data]
+            w = bbox_data[3]-bbox_data[0]
+            d = bbox_data[4]-bbox_data[1]
+            h = bbox_data[5]-bbox_data[2]
+            x = (bbox_data[3]+bbox_data[0])/2
+            y = (bbox_data[4]+bbox_data[1])/2
+            z = (bbox_data[5]+bbox_data[2])/2
 
-        diagnal_d = math.sqrt(w*w + d*d + h*h)
-        scale_factor = 1 / diagnal_d
-        move_vector = Base.Vector(-x, -y, -z)
+            diagnal_d = math.sqrt(w*w + d*d + h*h)
+            scale_factor = 1 / diagnal_d
+            move_vector = Base.Vector(-x, -y, -z)
 
-        if current_dir is None:
-            data.current_shape = None
+            if current_dir is None:
+                data.current_shape = None
 
-            next_cad_shape = Part.Shape()
-            next_cad_shape.read(next_dir)
-            data.extrusion_shape = None
-            data.bool_type = 0
-
-        else:
-            # NOTE: currently extrusion is the subtraction of target and current 
-            data.current_shape.read(current_dir)
-
-            next_cad_shape = Part.Shape()
-            next_cad_shape.read(next_dir)
-
-            data.extrusion_shape = None
-            if su.true_Volume(next_cad_shape) > su.true_Volume(data.current_shape):
+                next_cad_shape = Part.Shape()
+                next_cad_shape.read(next_dir)
+                data.extrusion_shape = None
                 data.bool_type = 0
+
             else:
-                data.bool_type = 1
+                # NOTE: currently extrusion is the subtraction of target and current 
+                data.current_shape.read(current_dir)
 
-        data.target_shape.scale(scale_factor, Base.Vector(0, 0, 0))
-        if data.current_shape:
-            data.current_shape.scale(scale_factor, Base.Vector(0, 0, 0))
+                next_cad_shape = Part.Shape()
+                next_cad_shape.read(next_dir)
 
-            # normalize model location
-            if self.reposition:
-                data.current_shape.translate(move_vector)
+                data.extrusion_shape = None
+                if su.true_Volume(next_cad_shape) > su.true_Volume(data.current_shape):
+                    data.bool_type = 0
+                else:
+                    data.bool_type = 1
 
-        return data
+            data.target_shape.scale(scale_factor, Base.Vector(0, 0, 0))
+            if data.current_shape:
+                data.current_shape.scale(scale_factor, Base.Vector(0, 0, 0))
+
+                # normalize model location
+                if self.reposition:
+                    data.current_shape.translate(move_vector)
+
+            return data
+        except Exception as e:
+            print(f"[SKIP] invalid shape at pair index {pair[4]}: {e}")
+            return None
     
     def __next__(self):
         if self.num < len(self.pairs):
