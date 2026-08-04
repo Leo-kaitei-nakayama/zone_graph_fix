@@ -1,0 +1,38 @@
+# Environment for running ZoneGraph.
+#
+#   conda env create -f environment.yml
+#   conda activate zonegraph
+#
+# Notes:
+#  * FreeCAD is installed from conda-forge; setup.py picks its python bindings
+#    up automatically from $CONDA_PREFIX/lib.
+#  * PyTorch is deliberately installed with pip rather than from conda-forge.
+#    The prebuilt DGL wheels link against the upstream PyPI libtorch, and the
+#    conda-forge build uses a different C++ ABI, which makes DGL fail to load
+#    its graphbolt library.
+#  * DGL 2.1.0 ships binaries only for specific torch versions, so torch is
+#    pinned to one of them (2.2.1).
+#  * mayavi (used by utils/vis_utils.py) is optional and only needed for the
+#    rendering helpers, which are not part of the training or inference paths.
+name: zonegraph
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - freecad
+  - numpy<2
+  - networkx
+  - trimesh
+  - joblib
+  - matplotlib
+  - scipy
+  - pip
+  - pip:
+      - torch==2.2.1
+      - dgl==2.1.0
+      - torchdata==0.7.1
+      - pandas
+      - pydantic
+      - psutil
+      - tqdm
+      - requests

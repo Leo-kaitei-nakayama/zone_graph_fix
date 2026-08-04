@@ -15,20 +15,27 @@ from train_preprocess import *
 import hyperparameters as hp
 import copy
 import joblib
+import shutil
 
 def train_batch(gs, ls, agent):
     loss = agent.update_by_extrusion(ls, gs)
     return loss
     
-def train(data_path, folder):
+def train(data_path, folder, batch_size=None):
 
-    if os.path.exists(folder) is True: 
+    if batch_size is None:
+        batch_size = hp.batch_size
+
+    if os.path.exists(folder) is True:
         shutil.rmtree(folder) 
     if not os.path.exists(folder):
         os.makedirs(folder)
 
     agent = Agent(folder)
-    
+    agent.train()
+
+    data_mgr = DataManager()
+
     train_loss_list = []
     validation_loss_list = []
     min_validation_loss = np.inf
@@ -65,7 +72,7 @@ def train(data_path, folder):
                     gs.append(neg_g)
                     ls.append(to_tensor([0]))
 
-                    if len(gs) >= hp.batch_size:
+                    if len(gs) >= batch_size:
                         loss = train_batch(gs, ls, agent)
                         gs = []
                         ls = []
@@ -88,6 +95,7 @@ def validate(data_path, folder):
     
     agent = Agent(folder)
     agent.load_weights()
+    agent.eval()
 
     data_mgr = DataManager()
 
@@ -132,6 +140,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='ZoneGraph')
     parser.add_argument('--data_path', default='processed_data', type=str)
     parser.add_argument('--output_path', default='train_output', type=str)
+    parser.add_argument('--batch_size', default=hp.batch_size, type=int)
     args = parser.parse_args()
 
-    train(args.data_path, args.output_path)
+    train(args.data_path, args.output_path, args.batch_size)

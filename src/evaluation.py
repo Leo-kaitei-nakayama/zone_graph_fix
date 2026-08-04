@@ -3,6 +3,7 @@ sys.path.append('..')
 
 from objects import *
 import random
+import time
 import torch
 
 def sort_extrusions_by_random(extrusions):

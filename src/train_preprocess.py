@@ -23,6 +23,8 @@ def hit_target_in_path(zone_graph, depth, max_depth):
         return False
 
     next_extrusions = get_proposals(zone_graph)
+    if len(next_extrusions) == 0:
+        return False
     random.shuffle(next_extrusions)
     next_zone_graph = zone_graph.update_to_next_zone_graph(next_extrusions[0])
     ret = hit_target_in_path(next_zone_graph, depth+1, max_depth)

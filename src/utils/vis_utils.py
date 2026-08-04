@@ -111,8 +111,8 @@ def display_step(extrusion_shape, ext_type, original_shape, bound_obj=None, file
     mlab.figure(bgcolor=(1,1,1), size=(800, 800))
 
     if bound_obj:
-        display_bound_obj(bound_obj)
-    
+        display_cad(bound_obj)
+
     if extrusion_shape and not extrusion_shape.isNull():
         if ext_type == "add":
             display_cad(extrusion_shape, color=(0.0, 1, 0.0), opacity=0.5)

@@ -12,6 +12,7 @@ import networkx as nx
 from utils.edge_utils import *
 from utils.face_utils import *
 from utils.solid_utils import *
+import utils.solid_utils as su
 from utils.vector_utils import *
 from utils.vertex_utils import *
 from utils.space_splitter import *
@@ -23,6 +24,22 @@ import time
 zone_sample_num = 500
 eps = 10e-6
 vol_eps = 10e-7
+
+
+def shape_to_string(shape):
+    """Serialise a Part.Shape to a BRep string so that it can be pickled."""
+    if shape is None:
+        return None
+    return shape.exportBrepToString()
+
+
+def string_to_shape(brep_string):
+    """Rebuild a Part.Shape from the output of shape_to_string."""
+    if brep_string is None:
+        return None
+    shape = Part.Shape()
+    shape.importBrepFromString(brep_string)
+    return shape
 
 class Extrusion:
     def __init__(self, cad_shape=None):
@@ -43,17 +60,13 @@ class Extrusion:
     
     def __getstate__(self):
         state = self.__dict__.copy()
-        if self.cad_shape:
-            state['cad_shape'] = self.cad_shape.exportBrepToString()
+        state['cad_shape'] = shape_to_string(self.cad_shape)
         return state
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        if self.cad_shape:
-            shape = Part.Shape()
-            shape.importBrepFromString(self.cad_shape)
-            self.cad_shape = shape
-    
+        self.cad_shape = string_to_shape(self.cad_shape)
+
 def get_extrusion_heur_score(extrusion, zone_graph):
     zone_to_current_label = copy.deepcopy(zone_graph.zone_to_current_label)
     zone_to_target_label = zone_graph.zone_to_target_label
@@ -84,7 +97,7 @@ def get_extrusion_heur_score(extrusion, zone_graph):
             U += zone_graph.zones[z_i].cad_shape.Volume
         if not zone_to_current_label[z_i] and zone_to_target_label[z_i]:
             U += zone_graph.zones[z_i].cad_shape.Volume
-    heur_score2 = I/U
+    heur_score2 = I/U if U > 0 else 0
 
     heur_score2 = 0
     return heur_score1, heur_score2
@@ -99,17 +112,13 @@ class Zone:
         
     def __getstate__(self):
         state = self.__dict__.copy()
-        if self.cad_shape:
-            state['cad_shape'] = self.cad_shape.exportBrepToString()
+        state['cad_shape'] = shape_to_string(self.cad_shape)
         return state
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        if self.cad_shape:
-            shape = Part.Shape()
-            shape.importBrepFromString(self.cad_shape)
-            self.cad_shape = shape
-    
+        self.cad_shape = string_to_shape(self.cad_shape)
+
     def cal_inside_points(self):
         inside_points = []
 
@@ -163,37 +172,24 @@ class ZoneGraph:
         
     def __getstate__(self):
         state = self.__dict__.copy()
-        state['current_shape'] = self.current_shape.exportBrepToString() if self.current_shape else None
-        state['target_shape'] = self.target_shape.exportBrepToString() if self.target_shape else None
-        state['faces'] = [f.exportBrepToString() for f in self.faces]
-        state['planes'] = [p.exportBrepToString() for p in self.planes]
-        # zones自体はZoneオブジェクトのリストなので、Zone側のgetstateが自動で使われます
+        # Part.Shape objects cannot be pickled (and therefore cannot be deep
+        # copied or sent to a worker process), so every shape held by the graph
+        # is serialised to a BRep string here and rebuilt in __setstate__.
+        # Zone objects in self.zones take care of themselves.
+        state['current_shape'] = shape_to_string(self.current_shape)
+        state['target_shape'] = shape_to_string(self.target_shape)
+        state['bbox'] = shape_to_string(self.bbox)
+        state['faces'] = [shape_to_string(f) for f in self.faces]
+        state['planes'] = [shape_to_string(p) for p in self.planes]
         return state
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        if self.current_shape:
-            shape = Part.Shape()
-            shape.importBrepFromString(self.current_shape)
-            self.current_shape = shape
-        if self.target_shape:
-            shape = Part.Shape()
-            shape.importBrepFromString(self.target_shape)
-            self.target_shape = shape
-
-        new_faces = []
-        for f_str in self.faces:
-            shape = Part.Shape()
-            shape.importBrepFromString(f_str)
-            new_faces.append(shape)
-        self.faces = new_faces
-
-        new_planes = []
-        for p_str in self.planes:
-            shape = Part.Shape()
-            shape.importBrepFromString(p_str)
-            new_planes.append(shape)
-        self.planes = new_planes
+        self.current_shape = string_to_shape(self.current_shape)
+        self.target_shape = string_to_shape(self.target_shape)
+        self.bbox = string_to_shape(self.bbox)
+        self.faces = [string_to_shape(f) for f in self.faces]
+        self.planes = [string_to_shape(p) for p in self.planes]
         
     def copy(self):
         new = ZoneGraph()
@@ -526,4 +522,6 @@ class ZoneGraph:
             if not self.zone_to_current_label[z_i] and self.zone_to_target_label[z_i]:
                 U += zone.cad_shape.Volume
 
-        return  I/U
+        # U is 0 only when the current and target shapes are both empty, which
+        # counts as a perfect (if degenerate) reconstruction.
+        return I/U if U > 0 else 1.0

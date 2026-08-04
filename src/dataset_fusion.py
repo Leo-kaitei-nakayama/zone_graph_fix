@@ -5,6 +5,7 @@ sys.path.append('..')
 
 import os
 from pathlib import Path
+import argparse
 import json
 import glob
 import random
@@ -13,6 +14,10 @@ import joblib
 
 from objects import *
 from dataset import *
+
+import Part
+from FreeCAD import Base
+import utils.solid_utils as su
 
 class FusionDataManager:
 

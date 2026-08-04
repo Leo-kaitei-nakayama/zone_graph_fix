@@ -19,17 +19,16 @@ import multiprocessing
 
 def infer(seq_id, sort_option, data_path, max_time, max_step):
 
-    if sort_option == 'random':
-        folder =  str(sort_option)
-        agent = None
-    if sort_option == 'heur':
-        folder =  str(sort_option)
-        agent = None
+    if sort_option not in ('random', 'heur', 'agent'):
+        raise ValueError("invalid --option %r, expected one of random/heur/agent" % sort_option)
+
+    folder = str(sort_option)
+    agent = None
     if sort_option == 'agent':
-        folder =  str(sort_option)
         agent = Agent('../../train_output')
         agent.load_weights()
-    
+        agent.eval()
+
     if not os.path.exists(folder):
         os.makedirs(folder)
 

@@ -96,7 +96,8 @@ class DataManager:
         print('seq_path', seq_path)
 
         path = Path(seq_path)
-        step_names = list(path.glob('*'))
+        # Ignore junk entries such as .DS_Store that macOS drops into the folders.
+        step_names = [p for p in path.glob('*') if not p.name.startswith('.')]
         sequence_length = len(step_names)
         start_index = 0
         max_step = 0
@@ -104,14 +105,14 @@ class DataManager:
 
         print('step names', step_names)
 
-        for filename in step_names:
-            if 'DS' in str(filename):
-                os.system("rm -f " + os.path.join(fusion_data_folder, seq_id, str(filename)))
-
         for step_name in step_names:
-            if 'Unsupported' in str(step_name):
+            if 'Unsupported' in step_name.name:
                 return [], 'unsupported_operation'
-            step = int(str(step_name).split('/')[-1])
+            try:
+                step = int(step_name.name)
+            except ValueError:
+                print('unexpected step folder', step_name)
+                return [], 'wrong_load_length'
             if step >= max_step:
                 max_step = step
 
@@ -200,8 +201,12 @@ class DataManager:
             display_object(current_shape, bound_obj=zone_graph.bbox, color=(0.8, 0.8, 0.8), file=step_path + '_shape.png')
 
             extrusion = step[1]
+            if extrusion is None:
+                continue
             extrusion_zone_shapes = [zone_graph.zones[i].cad_shape for i in extrusion.zone_indices]
             extrusion_shape = merge_solids(extrusion_zone_shapes)
+            if extrusion_shape is None:
+                continue
             if extrusion.bool_type == 0:
                 display_object(extrusion_shape, bound_obj=zone_graph.bbox, color=(0.0, 1.0, 0), file=step_path + '_extrusion.png')
             else:
@@ -218,8 +223,10 @@ class DataManager:
             # display_object(current_shape, bound_obj=zone_graph.bbox, color=(0.8, 0.8, 0.8), file=step_path + '_shape.png')
 
             extrusion = step[1]
-            extrusion_zone_shapes = [zone_graph.zones[i].cad_shape for i in extrusion.zone_indices]
-            extrusion_shape = merge_solids(extrusion_zone_shapes)
+            extrusion_shape = None
+            if extrusion is not None:
+                extrusion_zone_shapes = [zone_graph.zones[i].cad_shape for i in extrusion.zone_indices]
+                extrusion_shape = merge_solids(extrusion_zone_shapes)
 
             if not current_shape is None:
                 current_shape.exportStep(step_path + '_shape.stp')

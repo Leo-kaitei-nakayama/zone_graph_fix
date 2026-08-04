@@ -1,0 +1,13 @@
+# datasets and generated data
+/data/
+src/processed_data/
+src/train_output/
+src/*.txt
+
+# inference results
+src/experiments/exp_infer/random/
+src/experiments/exp_infer/heur/
+src/experiments/exp_infer/agent/
+
+__pycache__/
+*.py[cod]

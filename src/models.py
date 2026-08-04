@@ -90,10 +90,12 @@ class MPLayer(nn.Module):
 
 
     def forward(self, g, node_feats):
-        g.ndata['h'] = node_feats
-        g.send(g.edges(), self.message)
-        g.recv(g.nodes(), self.reduce)
-        h = g.ndata.pop('h')
+        # DGL removed the explicit send/recv pair in 0.5; update_all with the
+        # same user defined message/reduce functions is the direct replacement.
+        with g.local_scope():
+            g.ndata['h'] = node_feats
+            g.update_all(self.message, self.reduce)
+            h = g.ndata['h']
         h = self.linear(h)
         return h
 

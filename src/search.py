@@ -30,7 +30,20 @@ class SearchSolution():
         self.best_time = None
         self.best_score = 0
 
-def dfs_best_recon(zone_graph, max_step, max_time, expand_width, sort_option, best_sol, start_time, folder, agent=None, cur_step=0, cur_seq=[], visited_graphs=set(), visited_extrusions=set(), data_mgr=DataManager()):
+def dfs_best_recon(zone_graph, max_step, max_time, expand_width, sort_option, best_sol, start_time, folder, agent=None, cur_step=0, cur_seq=None, visited_graphs=None, visited_extrusions=None, data_mgr=None):
+
+    # These accumulate search state and are threaded through the recursion, so
+    # they must not be shared mutable defaults - otherwise a second call to
+    # dfs_best_recon in the same process would start from the previous search's
+    # visited sets.
+    if cur_seq is None:
+        cur_seq = []
+    if visited_graphs is None:
+        visited_graphs = set()
+    if visited_extrusions is None:
+        visited_extrusions = set()
+    if data_mgr is None:
+        data_mgr = DataManager()
 
     if zone_graph.is_done():
         return True
