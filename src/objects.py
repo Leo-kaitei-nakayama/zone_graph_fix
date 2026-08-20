@@ -41,6 +41,20 @@ def string_to_shape(brep_string):
     shape.importBrepFromString(brep_string)
     return shape
 
+
+def string_to_face(brep_string):
+    """Rebuild a face from the output of shape_to_string.
+
+    importBrepFromString always yields a generic Part.Shape; face-only
+    operations such as curvatureAt/normalAt live on Part.Face, so unwrap the
+    single contained face. Without this, graphs loaded from joblib crash the
+    proposal generator.
+    """
+    shape = string_to_shape(brep_string)
+    if shape is not None and len(shape.Faces) == 1:
+        return shape.Faces[0]
+    return shape
+
 class Extrusion:
     def __init__(self, cad_shape=None):
         self.cad_shape = cad_shape
@@ -188,8 +202,8 @@ class ZoneGraph:
         self.current_shape = string_to_shape(self.current_shape)
         self.target_shape = string_to_shape(self.target_shape)
         self.bbox = string_to_shape(self.bbox)
-        self.faces = [string_to_shape(f) for f in self.faces]
-        self.planes = [string_to_shape(p) for p in self.planes]
+        self.faces = [string_to_face(f) for f in self.faces]
+        self.planes = [string_to_face(p) for p in self.planes]
         
     def copy(self):
         new = ZoneGraph()

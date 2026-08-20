@@ -19,7 +19,7 @@ def train_batch(gs, ls, agent):
     loss = agent.update_by_extrusion(ls, gs)
     return loss
     
-def train(data_path, folder, batch_size=None):
+def train(data_path, folder, batch_size=None, validate_limit=0):
 
     if batch_size is None:
         batch_size = hp.batch_size
@@ -80,31 +80,29 @@ def train(data_path, folder, batch_size=None):
  
         # validate after each training epoch
         agent.save_weights()
-        validation_loss = validate(data_path, folder)
+        validation_loss = validate(data_path, folder, validate_limit)
         validation_loss_list.append(validation_loss)
         write_list_to_file(os.path.join(folder, 'validationloss.txt'), validation_loss_list)
         if validation_loss <= min_validation_loss:
             min_validation_loss = validation_loss
             agent.save_best_weights()
 
-def validate(data_path, folder):
+def validate(data_path, folder, validate_limit=0):
 
     print('validation----------------------------------------')
-    
+
     agent = Agent(folder)
     agent.load_weights()
     agent.eval()
 
     data_mgr = DataManager()
 
-    if os.path.isfile(os.path.join('gt_step_to_extrusions.joblib')):
-        step_to_extrusions = joblib.load(os.path.join('gt_step_to_extrusions.joblib'))
-    else:
-        step_to_extrusions = defaultdict(list)
-
     total_rank_sum = 0
 
     validate_ids = read_file_to_list('validate_ids.txt')
+    if validate_limit > 0:
+        validate_ids = validate_ids[0:validate_limit]
+
     for validation_index, seq_id in enumerate(validate_ids):
         print('validation_index', validation_index, 'seq_id', seq_id)
 
@@ -112,7 +110,7 @@ def validate(data_path, folder):
             gt_seq = data_mgr.load_processed_sequence(os.path.join(data_path, seq_id, 'gt'))
         except:
             continue
-            
+
         for step_index, gt_step in enumerate(gt_seq):
             try:
                 pos_g = joblib.load(os.path.join(data_path, seq_id, 'train', str(step_index) + '_' + str(1) + '_g.joblib'))
@@ -123,14 +121,20 @@ def validate(data_path, folder):
                 break
 
             if pos_g and pos_e and neg_g and neg_e:
-                gt_zone_graph = gt_step[0]
-                gt_extrusion = gt_step[1]
-                extrusions = get_proposals(gt_zone_graph)
-                agent_ranked_extrusions = sort_extrusions_by_agent(extrusions, gt_zone_graph, agent)
-                for i, extrusion in enumerate(agent_ranked_extrusions):
-                    if gt_extrusion.hash() == extrusion.hash():
-                        total_rank_sum += i
-                        break
+                # One malformed sequence must not kill a multi-hour training
+                # run; skip it and keep ranking the rest.
+                try:
+                    gt_zone_graph = gt_step[0]
+                    gt_extrusion = gt_step[1]
+                    extrusions = get_proposals(gt_zone_graph)
+                    agent_ranked_extrusions = sort_extrusions_by_agent(extrusions, gt_zone_graph, agent)
+                    for i, extrusion in enumerate(agent_ranked_extrusions):
+                        if gt_extrusion.hash() == extrusion.hash():
+                            total_rank_sum += i
+                            break
+                except Exception as e:
+                    print('validation step failed for', seq_id, 'step', step_index, ':', e)
+                    continue
 
     return total_rank_sum
 
@@ -139,6 +143,9 @@ if __name__ == "__main__":
     parser.add_argument('--data_path', default='processed_data', type=str)
     parser.add_argument('--output_path', default='train_output', type=str)
     parser.add_argument('--batch_size', default=hp.batch_size, type=int)
+    parser.add_argument('--validate_limit', default=0, type=int,
+                        help='validate on at most this many sequences per epoch (0 = all); '
+                             'validation runs proposal generation and can dominate the epoch time')
     args = parser.parse_args()
 
-    train(args.data_path, args.output_path, args.batch_size)
+    train(args.data_path, args.output_path, args.batch_size, args.validate_limit)
