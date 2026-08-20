@@ -57,7 +57,7 @@ def infer(seq_id, sort_option, data_path, max_time, max_step):
 
 def infer_all(sort_option, data_path, max_time, max_step):
 
-    all_ids = os.listdir(data_path)
+    all_ids = [s for s in os.listdir(data_path) if not s.startswith('.')]
 
     for seq_id in all_ids:
 

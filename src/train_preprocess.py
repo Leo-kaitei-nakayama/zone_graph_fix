@@ -177,7 +177,8 @@ def process(raw_data_path, processed_data_path, num_workers=1):
         os.makedirs(processed_data_path)
     os.makedirs(os.path.join(processed_data_path, '.markers'), exist_ok=True)
 
-    seq_ids = os.listdir(raw_data_path)
+    # skip dot entries such as the .markers folder dataset_fusion leaves behind
+    seq_ids = [s for s in os.listdir(raw_data_path) if not s.startswith('.')]
     pending = [s for s in seq_ids if not os.path.exists(marker_path(processed_data_path, s))]
     skipped = len(seq_ids) - len(pending)
     if skipped > 0:
@@ -224,7 +225,7 @@ def split_data_for_training(dataset_path):
     train_ids = []
     validate_ids = []
     test_ids = []
-    all_ids = os.listdir(dataset_path)
+    all_ids = [s for s in os.listdir(dataset_path) if not s.startswith('.')]
     random.shuffle(all_ids)
     length = len(all_ids)
     train_ids = all_ids[0: int(0.85 * length)]
