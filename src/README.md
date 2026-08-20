@@ -71,7 +71,19 @@ python dataset_fusion.py
 --extrusion_path "path to your fusion GT extrusion tool data folder"
 
 --output_path "path to your output processed fusion data folder"
+
+--num_workers "designs converted concurrently (default: cpu count - 2)"
+
+--design_timeout "seconds allowed per design; 0 = automatic (600 + 60 per step)"
 ```
+
+Designs are converted `--num_workers` at a time, each in its own process with a
+deadline. This matters beyond speed: a few STEP files in the dataset hang the
+OpenCascade reader outright (no exception - the process spins forever), and the
+deadline is what turns those into a logged `timed out` skip instead of a stuck
+job. Attempted designs are recorded under `<output_path>/.markers`, so
+re-running the same command resumes where it left off; delete that folder to
+reconvert from scratch.
 
 ### Generating training data
 

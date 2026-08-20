@@ -184,6 +184,7 @@ def process(raw_data_path, processed_data_path, num_workers=1):
         print('resume: skipping', skipped, 'already attempted sequences')
     print('processing', len(pending), 'sequences with', num_workers, 'workers')
 
+    total = len(pending)
     running = []  # (process, deadline, seq_id)
     done_count = 0
     while pending or running:
@@ -208,7 +209,7 @@ def process(raw_data_path, processed_data_path, num_workers=1):
                 continue
             mark_done(processed_data_path, seq_id)
             done_count += 1
-            print('progress:', done_count, '/', done_count + len(pending) + len(still_running), 'sequences attempted')
+            print('progress:', done_count, '/', total, 'sequences attempted')
         running = still_running
 
     print('all data processing complete !')
