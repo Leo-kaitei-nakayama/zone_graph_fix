@@ -12,9 +12,29 @@ from objects import *
 from models import *
 import hyperparameters as hp
 
-# The original code assumed a CUDA machine; fall back to the CPU when there is
-# no GPU available.
-DEVICE = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+def _select_device():
+    """Pick the training device, honoring the ZONEGRAPH_DEVICE env var.
+
+    torch seeing CUDA is not enough: the dgl wheel on PyPI is CPU-only (the
+    CUDA builds live on data.dgl.ai), and asking it to copy a graph to the GPU
+    aborts deep in libdgl. Probe dgl itself and fall back to the CPU when it
+    cannot use the GPU.
+    """
+    forced = os.environ.get('ZONEGRAPH_DEVICE')
+    if forced:
+        return torch.device(forced)
+    if not torch.cuda.is_available():
+        return torch.device('cpu')
+    try:
+        dgl.graph(([0], [1]), num_nodes=2, device=torch.device('cuda:0'))
+        return torch.device('cuda:0')
+    except Exception:
+        print('warning: torch sees CUDA but this dgl build is CPU-only; running on CPU.')
+        print('for GPU training install a CUDA dgl wheel, e.g.:')
+        print('  pip install dgl==2.1.0 -f https://data.dgl.ai/wheels/cu121/repo.html')
+        return torch.device('cpu')
+
+DEVICE = _select_device()
 
 def to_numpy(item):
     if item.is_cuda:

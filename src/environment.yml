@@ -12,6 +12,12 @@
 #    its graphbolt library.
 #  * DGL 2.1.0 ships binaries only for specific torch versions, so torch is
 #    pinned to one of them (2.2.1).
+#  * The dgl wheel on PyPI is CPU-only. Training works with it (the code falls
+#    back to the CPU), but for GPU training replace it with a CUDA build:
+#        pip uninstall -y dgl
+#        pip install dgl==2.1.0 -f https://data.dgl.ai/wheels/cu121/repo.html
+#  * If PyPI downloads crawl at kB/s, fetch torch from PyTorch's own index:
+#        pip install torch==2.2.1 --index-url https://download.pytorch.org/whl/cu121
 #  * mayavi (used by utils/vis_utils.py) is optional and only needed for the
 #    rendering helpers, which are not part of the training or inference paths.
 name: zonegraph
