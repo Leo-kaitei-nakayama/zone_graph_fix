@@ -11,6 +11,7 @@ from objects import *
 from proposal import *
 import multiprocessing
 import shutil
+import time
 import matplotlib.pyplot as plt
 import copy
 import joblib
@@ -146,28 +147,79 @@ def process_single_data(seq_id, raw_data_path, processed_data_path):
 
     print('single data processing complete !')
 
-def process(raw_data_path, processed_data_path):   
+def sequence_timeout(raw_data_path, seq_id):
+    sequence_length = len(list(Path(os.path.join(raw_data_path, seq_id)).glob('*')))
+    return 200 + sequence_length * 100
+
+
+def marker_path(processed_data_path, seq_id):
+    return os.path.join(processed_data_path, '.markers', seq_id)
+
+
+def mark_done(processed_data_path, seq_id):
+    with open(marker_path(processed_data_path, seq_id), 'w') as f:
+        f.write('done\n')
+
+
+def process(raw_data_path, processed_data_path, num_workers=1):
+    """
+    Run process_single_data for every sequence, num_workers at a time.
+
+    Sequences are independent, so this is embarrassingly parallel; each one
+    still runs in its own process with its own timeout, exactly like the
+    original serial loop. A marker file is written per attempted sequence
+    (finished, filtered out, or timed out alike), so an interrupted run can be
+    resumed by re-running the same command - already attempted sequences are
+    skipped. Delete <output_path>/.markers to redo everything.
+    """
 
     if not os.path.exists(processed_data_path):
         os.makedirs(processed_data_path)
+    os.makedirs(os.path.join(processed_data_path, '.markers'), exist_ok=True)
 
     seq_ids = os.listdir(raw_data_path)
-    for seq_id in seq_ids:
-        sequence_length = len(list(Path(os.path.join(raw_data_path, seq_id)).glob('*')))
-        print('sequence_length', sequence_length)
+    pending = [s for s in seq_ids if not os.path.exists(marker_path(processed_data_path, s))]
+    skipped = len(seq_ids) - len(pending)
+    if skipped > 0:
+        print('resume: skipping', skipped, 'already attempted sequences')
+    print('processing', len(pending), 'sequences with', num_workers, 'workers')
 
-        worker_process = multiprocessing.Process(target=process_single_data, name="process_single_data", args=(seq_id, raw_data_path, processed_data_path))
-        worker_process.start()
-        worker_process.join(200 + sequence_length * 100)
-        
-        if worker_process.is_alive():
-            print ("process_single_data is running... let's kill it...")
-            worker_process.terminate()
-            worker_process.join()
+    running = []  # (process, deadline, seq_id)
+    done_count = 0
+    while pending or running:
+        while pending and len(running) < num_workers:
+            seq_id = pending.pop(0)
+            worker = multiprocessing.Process(target=process_single_data, name="process_single_data", args=(seq_id, raw_data_path, processed_data_path))
+            worker.start()
+            running.append((worker, time.time() + sequence_timeout(raw_data_path, seq_id), seq_id))
+
+        time.sleep(1)
+
+        still_running = []
+        for worker, deadline, seq_id in running:
+            if not worker.is_alive():
+                worker.join()
+            elif time.time() > deadline:
+                print('sequence', seq_id, 'timed out, killing worker')
+                worker.terminate()
+                worker.join()
+            else:
+                still_running.append((worker, deadline, seq_id))
+                continue
+            mark_done(processed_data_path, seq_id)
+            done_count += 1
+            print('progress:', done_count, '/', done_count + len(pending) + len(still_running), 'sequences attempted')
+        running = still_running
 
     print('all data processing complete !')
 
 def split_data_for_training(dataset_path):
+    # Keep an existing split so that resumed runs (and later training) use the
+    # same train/validate/test membership.
+    if os.path.isfile('train_ids.txt') and os.path.isfile('validate_ids.txt') and os.path.isfile('test_ids.txt'):
+        print('split files already exist, keeping them')
+        return
+
     train_ids = []
     validate_ids = []
     test_ids = []
@@ -187,9 +239,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='train_preprocess')
     parser.add_argument('--data_path', default='../data/fusion_processed', type=str)
     parser.add_argument('--output_path', default='processed_data', type=str)
+    parser.add_argument('--num_workers', default=max(1, multiprocessing.cpu_count() - 2), type=int,
+                        help='sequences processed concurrently (default: cpu count - 2)')
     args = parser.parse_args()
 
     split_data_for_training(args.data_path)
-    process(args.data_path, args.output_path)
+    process(args.data_path, args.output_path, args.num_workers)
 
 

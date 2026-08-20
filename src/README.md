@@ -81,10 +81,21 @@ python train_preprocess.py
 --data_path "path to your processed fusion data folder"
 
 --output_path "path to your output processed data for training"
+
+--num_workers "sequences processed concurrently (default: cpu count - 2)"
 ```
 
 This also writes `train_ids.txt`, `validate_ids.txt` and `test_ids.txt`, which
-`train.py` reads from the current directory.
+`train.py` reads from the current directory. Existing split files are kept, so
+the train/validate/test membership stays stable across runs.
+
+Sequences are independent and run `--num_workers` at a time, each in its own
+process with its own timeout. Every attempted sequence (finished, filtered out,
+or timed out) is recorded under `<output_path>/.markers`, so an interrupted run
+resumes where it left off when re-run with the same command. Delete the
+`.markers` folder to reprocess from scratch. On the full Fusion360 dataset this
+stage is by far the most expensive; budget hours to days depending on core
+count.
 
 ### Training
 
