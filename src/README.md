@@ -135,10 +135,26 @@ python infer.py
 --max_time "time limit for the search to terminate"
 
 --max_step "maximum sequence length"
+
+--ids_file "only evaluate ids listed in this file (e.g. ../../test_ids.txt)"
+
+--num_workers "sequences evaluated concurrently (default 1 = faithful timing)"
 ```
 
-The `agent` option loads the checkpoints written by `train.py` from
-`../../train_output`.
+The `agent` option loads the best-validation checkpoints written by `train.py`
+from `../../train_output`. Pass `--ids_file ../../test_ids.txt` to evaluate on
+the held-out test split. Attempted sequences are recorded under
+`<option>/.attempted`, so an interrupted evaluation resumes when re-run.
+Search wall-clock time is part of the reported metric, so `--num_workers`
+defaults to 1; raising it speeds things up but inflates per-sequence times
+through core contention.
+
+Summarize the results (per option: solved count, mean/median IOU, exact
+reconstruction rate, mean time and sequence length):
+
+```
+python summarize_results.py --ids_file ../../test_ids.txt
+```
 
 ## Notes on the data layout
 
