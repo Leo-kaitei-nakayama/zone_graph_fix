@@ -19,10 +19,18 @@ import multiprocessing
 
 # from utils.vis_utils import *
 
-def infer(seq_id, sort_option, data_path, max_time, max_step):
+def infer(seq_id, sort_option, data_path, max_time, max_step, seed=0):
 
     if sort_option not in ('random', 'heur', 'agent'):
         raise ValueError("invalid --option %r, expected one of random/heur/agent" % sort_option)
+
+    # Derive a per-sequence seed from the sequence id (crc32 is stable across
+    # processes, unlike hash()), so results do not depend on worker count or
+    # evaluation order. This makes the 'random' option reproducible; heur and
+    # agent are already deterministic.
+    import random as _random
+    import zlib
+    _random.seed(zlib.crc32(seq_id.encode()) ^ seed)
 
     folder = str(sort_option)
     agent = None
@@ -65,7 +73,7 @@ def mark_done(folder, seq_id):
         f.write('done\n')
 
 
-def infer_all(sort_option, data_path, max_time, max_step, ids_file=None, num_workers=1):
+def infer_all(sort_option, data_path, max_time, max_step, ids_file=None, num_workers=1, seed=0):
     """
     Run the search over sequences, num_workers at a time, each in its own
     process with a max_time + 100 second deadline.
@@ -102,7 +110,7 @@ def infer_all(sort_option, data_path, max_time, max_step, ids_file=None, num_wor
     while pending or running:
         while pending and len(running) < num_workers:
             seq_id = pending.pop(0)
-            worker = multiprocessing.Process(target=infer, name="infer", args=(seq_id, sort_option, data_path, max_time, max_step, ))
+            worker = multiprocessing.Process(target=infer, name="infer", args=(seq_id, sort_option, data_path, max_time, max_step, seed, ))
             worker.start()
             running.append((worker, time.time() + max_time + 100, seq_id))
 
@@ -138,8 +146,10 @@ if __name__ == "__main__":
                         help='only evaluate ids listed in this file (e.g. ../../test_ids.txt)')
     parser.add_argument('--num_workers', default=1, type=int,
                         help='sequences evaluated concurrently (1 = faithful timing)')
+    parser.add_argument('--seed', default=0, type=int,
+                        help='seed for the random option (per-sequence, order-independent)')
     args = parser.parse_args()
-    infer_all(args.option, args.data_path, args.max_time, args.max_step, args.ids_file or None, args.num_workers)
+    infer_all(args.option, args.data_path, args.max_time, args.max_step, args.ids_file or None, args.num_workers, args.seed)
 
     
 

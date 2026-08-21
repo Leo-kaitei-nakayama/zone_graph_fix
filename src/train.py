@@ -18,8 +18,28 @@ import shutil
 def train_batch(gs, ls, agent):
     loss = agent.update_by_extrusion(ls, gs)
     return loss
-    
-def train(data_path, folder, batch_size=None, validate_limit=0):
+
+
+def seed_everything(seed):
+    """Fix every RNG that touches training, for run-to-run reproducibility.
+
+    On the CPU this makes training bit-exact between runs. On CUDA it removes
+    all controllable randomness (init, ordering); tiny run-to-run differences
+    can remain because some scatter/reduce kernels use non-deterministic
+    atomics.
+    """
+    import random as _random
+    _random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
+def train(data_path, folder, batch_size=None, validate_limit=0, seed=0):
+
+    seed_everything(seed)
 
     if batch_size is None:
         batch_size = hp.batch_size
@@ -146,6 +166,8 @@ if __name__ == "__main__":
     parser.add_argument('--validate_limit', default=0, type=int,
                         help='validate on at most this many sequences per epoch (0 = all); '
                              'validation runs proposal generation and can dominate the epoch time')
+    parser.add_argument('--seed', default=0, type=int,
+                        help='RNG seed for reproducible training')
     args = parser.parse_args()
 
-    train(args.data_path, args.output_path, args.batch_size, args.validate_limit)
+    train(args.data_path, args.output_path, args.batch_size, args.validate_limit, args.seed)

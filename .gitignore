@@ -1,8 +1,17 @@
 # datasets and generated data
 /data/
 src/processed_data/
-src/train_output/
+src/train_output/*
 src/*.txt
+
+# ...but keep the frozen experiment artifacts: the train/validate/test split
+# and the best checkpoints, so baseline numbers stay reproducible
+# (train_output is ignored by content, not as a directory, so the negations work)
+!src/train_ids.txt
+!src/validate_ids.txt
+!src/test_ids.txt
+!src/train_output/best_zone_encoder.pkl
+!src/train_output/best_decision_maker.pkl
 
 # inference results
 src/experiments/exp_infer/random/

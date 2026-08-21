@@ -156,6 +156,31 @@ reconstruction rate, mean time and sequence length):
 python summarize_results.py --ids_file ../../test_ids.txt
 ```
 
+## Using this as a baseline in your own paper
+
+To compare a new method against this system, do not try to match the 2021
+paper's published numbers - re-run this baseline under your own protocol and
+compare both methods under identical conditions:
+
+- **Freeze the split.** Commit `train_ids.txt` / `validate_ids.txt` /
+  `test_ids.txt` (`.gitignore` already whitelists them). Evaluate every
+  method on the same `test_ids.txt`.
+- **Freeze the checkpoint.** Commit `train_output/best_*.pkl` (whitelisted).
+- **Seed everything.** `train.py --seed N` makes training bit-reproducible on
+  CPU (on CUDA, tiny residual nondeterminism from atomic reductions can
+  remain). `infer.py --seed N` makes the random baseline reproducible
+  per-sequence, independent of worker count and evaluation order; heur and
+  agent are deterministic given a checkpoint.
+- **Report the denominators.** Only ~2/3 of raw designs are loadable under
+  the zone-graph validity filters; report results both over loadable designs
+  and over all designs if your method handles the rest.
+- **Time-based metrics** (time.txt) depend on machine load; run evaluations
+  with `--num_workers 1` on an otherwise idle machine, and prefer exact-
+  reconstruction rate and step counts as primary metrics.
+- Record the commit hash and `environment.yml` alongside your results;
+  `REPORT.md` documents how this implementation relates to the published
+  paper.
+
 ## Notes on the data layout
 
 `dataset_fusion.py` and `make_demo_data.py` both produce this layout, which is
