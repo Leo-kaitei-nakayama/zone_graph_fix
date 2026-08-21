@@ -19,7 +19,7 @@ import multiprocessing
 
 # from utils.vis_utils import *
 
-def infer(seq_id, sort_option, data_path, max_time, max_step, seed=0):
+def infer(seq_id, sort_option, data_path, max_time, max_step, seed=0, train_output='../../train_output', out_folder=None):
 
     if sort_option not in ('random', 'heur', 'agent'):
         raise ValueError("invalid --option %r, expected one of random/heur/agent" % sort_option)
@@ -32,12 +32,12 @@ def infer(seq_id, sort_option, data_path, max_time, max_step, seed=0):
     import zlib
     _random.seed(zlib.crc32(seq_id.encode()) ^ seed)
 
-    folder = str(sort_option)
+    folder = out_folder if out_folder else str(sort_option)
     agent = None
     if sort_option == 'agent':
         from agent import Agent
 
-        agent = Agent('../../train_output')
+        agent = Agent(train_output)
         # evaluate with the checkpoint that had the best validation loss
         agent.load_best_weights()
         agent.eval()
@@ -73,7 +73,7 @@ def mark_done(folder, seq_id):
         f.write('done\n')
 
 
-def infer_all(sort_option, data_path, max_time, max_step, ids_file=None, num_workers=1, seed=0):
+def infer_all(sort_option, data_path, max_time, max_step, ids_file=None, num_workers=1, seed=0, train_output='../../train_output', out_folder=None):
     """
     Run the search over sequences, num_workers at a time, each in its own
     process with a max_time + 100 second deadline.
@@ -95,7 +95,7 @@ def infer_all(sort_option, data_path, max_time, max_step, ids_file=None, num_wor
     else:
         all_ids = sorted(available)
 
-    folder = str(sort_option)
+    folder = out_folder if out_folder else str(sort_option)
     os.makedirs(os.path.join(folder, '.attempted'), exist_ok=True)
 
     pending = [s for s in all_ids if not os.path.exists(marker_path(folder, s))]
@@ -110,7 +110,7 @@ def infer_all(sort_option, data_path, max_time, max_step, ids_file=None, num_wor
     while pending or running:
         while pending and len(running) < num_workers:
             seq_id = pending.pop(0)
-            worker = multiprocessing.Process(target=infer, name="infer", args=(seq_id, sort_option, data_path, max_time, max_step, seed, ))
+            worker = multiprocessing.Process(target=infer, name="infer", args=(seq_id, sort_option, data_path, max_time, max_step, seed, train_output, folder, ))
             worker.start()
             running.append((worker, time.time() + max_time + 100, seq_id))
 
@@ -148,8 +148,12 @@ if __name__ == "__main__":
                         help='sequences evaluated concurrently (1 = faithful timing)')
     parser.add_argument('--seed', default=0, type=int,
                         help='seed for the random option (per-sequence, order-independent)')
+    parser.add_argument('--train_output', default='../../train_output', type=str,
+                        help='checkpoint folder for the agent option')
+    parser.add_argument('--out_folder', default='', type=str,
+                        help='results folder (default: the option name); use to evaluate several checkpoints side by side')
     args = parser.parse_args()
-    infer_all(args.option, args.data_path, args.max_time, args.max_step, args.ids_file or None, args.num_workers, args.seed)
+    infer_all(args.option, args.data_path, args.max_time, args.max_step, args.ids_file or None, args.num_workers, args.seed, args.train_output, args.out_folder or None)
 
     
 
