@@ -37,12 +37,14 @@ def seed_everything(seed):
     torch.backends.cudnn.benchmark = False
 
 
-def train(data_path, folder, batch_size=None, validate_limit=0, seed=0):
+def train(data_path, folder, batch_size=None, validate_limit=0, seed=0, epochs=None):
 
     seed_everything(seed)
 
     if batch_size is None:
         batch_size = hp.batch_size
+    if epochs is None:
+        epochs = hp.train_epoch_num
 
     if os.path.exists(folder) is True:
         shutil.rmtree(folder) 
@@ -61,7 +63,7 @@ def train(data_path, folder, batch_size=None, validate_limit=0, seed=0):
     gs = []
     ls = []
 
-    for epoch_index in range(hp.train_epoch_num):
+    for epoch_index in range(epochs):
         total_loss = 0
         print('epoch', epoch_index , '--------------------------------------------')
         train_ids = read_file_to_list('train_ids.txt')
@@ -168,6 +170,8 @@ if __name__ == "__main__":
                              'validation runs proposal generation and can dominate the epoch time')
     parser.add_argument('--seed', default=0, type=int,
                         help='RNG seed for reproducible training')
+    parser.add_argument('--epochs', default=hp.train_epoch_num, type=int,
+                        help='training epochs (default: hyperparameters.train_epoch_num)')
     args = parser.parse_args()
 
-    train(args.data_path, args.output_path, args.batch_size, args.validate_limit, args.seed)
+    train(args.data_path, args.output_path, args.batch_size, args.validate_limit, args.seed, args.epochs)
