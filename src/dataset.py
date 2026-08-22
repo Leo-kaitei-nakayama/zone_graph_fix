@@ -150,13 +150,25 @@ class DataManager:
             if data.extrusion_shape:
                 extrusion = Extrusion(data.extrusion_shape)
                 extrusion.bool_type = data.bool_type
+
+                # Designers routinely over-extrude tools past the target's
+                # bounding box (a cut that goes "all the way through" with
+                # margin). The part of the tool outside the zone graph's bbox
+                # is irrelevant to the reconstruction inside it, but it made
+                # the volume comparison below reject such steps. Clip the
+                # tool to the bbox before matching it against zones.
+                try:
+                    clipped = extrusion.cad_shape.common(zone_graph.bbox)
+                except Exception:
+                    return [], 'extrusion_clip_failed'
+                if clipped.isNull() or clipped.Volume < 10e-9:
+                    # tool lies entirely outside the modeled region
+                    return [], 'extrusion_outside'
+                extrusion.cad_shape = clipped
+
                 for i, zone in enumerate(zone_graph.zones):
                     if solid_contain_zone(extrusion.cad_shape, zone):
                         extrusion.zone_indices.append(i)
-
-                ret = self.check_extrusion_outside(extrusion, zone_graph)
-                if not ret:
-                    return [], 'extrusion_outside'
 
                 ret = self.check_extrusion_volume(extrusion, zone_graph)
                 if not ret:

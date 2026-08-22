@@ -45,6 +45,13 @@ DEMO_SEQUENCES = {
         ((0, 0, 4), (10, 16, 14), 0),
         ((16, 8, 0), (24, 16, 4), 1),
     ],
+    # A block with a corner cut by a tool that massively over-extrudes past
+    # the bounding box - standard CAD practice ("cut all the way through with
+    # margin"). Exercises the tool-clipping path in load_raw_sequence.
+    "demo_overcut": [
+        ((0, 0, 0), (20, 20, 10), 0),
+        ((10, 10, -30), (50, 50, 40), 1),
+    ],
 }
 
 
