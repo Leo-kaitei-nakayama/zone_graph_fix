@@ -7,8 +7,10 @@ subset (r1.0.0, 8,625 designs), using this repository's fixed pipeline.
 ## Verdict
 
 Checked against the paper's actual claims (main text + supplement), this run
-**reproduces the paper**, including a result that is easy to misread as a
-failure:
+**reproduces three of the paper's four measurable claim groups** - including
+one that is easy to misread as a failure - and documents one claim that does
+not reproduce with the released training recipe (the network's Fig 6 ranking
+quality; details below):
 
 1. **Dataset funnel matches.** Paper: zone graphs constructible for 6,900 /
    8,625 models (80%); GT modeling sequence representable for 5,175 / 8,625
@@ -28,15 +30,31 @@ failure:
    error, 197 s vs 242 s). Our tables show the same ordering for the same
    reasons, including heur finding shorter sequences.
 
-The network's advantages claimed by the paper are elsewhere: it ranks the GT
-extrusion ~2x better than the heuristic (Fig 6: 0.036 vs 0.070 average
-relative rank; random 0.486) - measurable here with `src/rank_eval.py` - and
-CAD designers prefer its sequences in a perceptual study (Table 2), which
-requires human raters and is out of scope for this run.
+The network's advantages claimed by the paper are elsewhere: a ~2x better
+ranking of the GT extrusion (Fig 6), and CAD designers preferring its
+sequences in a perceptual study (Table 2; requires human raters, out of
+scope here).
 
-**Open gap:** on the hardest slice (5+ GT steps) our agent trails heur by
-more (27% vs 57% exact) than the paper's IoU-vs-time curves suggest it
-should. Candidate explanations below.
+**The one claim that did not reproduce: Fig 6's ranking quality.** Measured
+with `src/rank_eval.py` (150 test sequences, 238 ranked steps):
+
+| method | paper (Fig 6) | 9-epoch checkpoint | 40-epoch checkpoint |
+|---|---|---|---|
+| random | 0.486 | 0.374 | - |
+| heur | 0.070 | **0.059** | - |
+| network | **0.036** | 0.107 | 0.150 |
+
+The heuristic matches the paper closely; the network does not, and more
+training makes it worse, not better. In the 40-epoch run the validation
+rank-sum wandered noisily (best at epoch 28), and the final six epochs
+produced bit-identical rank-sums - the signature of the network collapsing
+to constant (or NaN) outputs. Conclusion: the released training recipe
+(fixed lr 1e-4, one negative per positive, focal loss, no early-stopping
+criterion on ranking) does not reach the paper's reported ranking quality on
+this data, and destabilizes when run longer. Whatever schedule produced the
+paper's 0.036 is not in the released code or the paper text. This also
+explains the wider-than-expected agent-vs-heur gap on 5+ step designs in the
+search evaluation: search quality is downstream of ranking quality.
 
 ## Pipeline funnel
 
@@ -112,11 +130,17 @@ agent.
 4. **Geometry kernel drift.** FreeCAD 1.1.x / OpenCascade 7.x (2026) vs the
    2021-era kernel shifts zone counts and filter outcomes; denominators are
    close (54-65% vs 60-80%) but not identical.
-5. **Checkpoint quality.** Model selection used a noisy 100-sequence
-   rank-sum. `src/rank_eval.py` measures the paper's Fig 6 ranking metric
-   directly (reference: net 0.036, heur 0.070, random 0.486); if our net does
-   not land near 2x better than heur there, more training/tuning - not the
-   search - is where the remaining gap lives.
+5. **Training recipe limitations (measured).** A 40-epoch retrain with a
+   300-sequence validation (--epochs 40 --validate_limit 300 --seed 0) was
+   run to test whether the 9-epoch recipe was simply stopped early. It was
+   not: ranking quality degraded (0.150 vs 0.107) and training collapsed in
+   the final epochs (constant validation rank-sums). Closing the gap to the
+   paper's 0.036 would need actual training research - e.g. lower or decayed
+   learning rate, gradient clipping, more/neutral-labeled negatives per
+   positive, early stopping on the relative-rank metric itself - which is
+   beyond faithful reproduction of the released recipe. For baseline use,
+   the 9-epoch checkpoint is the better network baseline, and heur remains
+   this system's strongest configuration (as in the paper's own Table 1).
 
 ## Reproducing this report
 
